@@ -1,4 +1,4 @@
-import { TCPServer} from "./utils/tcp_server.ts";
+import { TCPServer} from "@utils/tcp_server.ts";
 
 import {Logger} from "https://deno.land/std/log/mod.ts";
 
