@@ -3,12 +3,38 @@ import {Logger, LogLevels} from "@modules/logging/logger.ts"
 
 export {LogLevels}
 
-type Client = string;
+
+interface ClientData{
+    server : TCPServer
+    connection : Deno.Conn
+}
+
+export class Client implements ClientData{
+    server!     : TCPServer
+    connection! : Deno.Conn;
+    readonly name: string
+
+    constructor( data:ClientData) {
+        this.name = `${data.connection.localAddr.hostname}:${data.connection.localAddr.port}`;
+        Object.assign( this, data);
+    }
+    sendString( data:string) {
+        this.sendBytes(this.server.encoder.encode( data) );
+    }
+    sendBytes(data:Uint8Array) {
+        this.connection.write( data );
+        this.connection.write( this.server.carriageReturn )
+    }
+    close() {
+        this.connection.close()
+    }
+
+}
 
 type Events = {
     connect     : [Client],
     disconnect  : [Client],
-    message     : [Client, string]
+    message     : [string, Client]
 }
 
 interface ServerOptions  {
@@ -31,17 +57,25 @@ class _ServerOptions implements ServerOptions {
 
 
 export class TCPServer extends EventEmitter<Events> {
-    clients : Map<Client, Deno.Conn> 
-    server : Deno.Listener
     options : _ServerOptions
+
+    clients : Map<string, Client> 
+    server : Deno.Listener
+    
+    carriageReturn : Uint8Array
     decoder : TextDecoder
+    encoder : TextEncoder
     logger : Logger
 
     constructor(options:ServerOptions) {
         super()
         this.options = Object.assign(new _ServerOptions(),  options);
         this.decoder = new TextDecoder( this.options.decoding );
-        this.clients = new Map<Client, Deno.Conn> ;
+        this.encoder = new TextEncoder();
+
+        this.carriageReturn = new Uint8Array([this.options.carriage_return])
+
+        this.clients = new Map<string, Client> ;
 
         this.logger = new Logger({
             name : this.options.name,
@@ -56,12 +90,14 @@ export class TCPServer extends EventEmitter<Events> {
 
     async listen_for_connections() {
         for await (const new_connection of this.server) {
-            const new_client:Client = `${new_connection.localAddr.hostname}:${new_connection.localAddr.port}`;
+            const new_client:Client = new Client({
+                server : this, connection : new_connection 
+            });
 
-            this.logger.INFO(`New Client : ${new_client}`)
+            this.logger.INFO(`New Client : ${new_client.name}`)
 
-            this.clients.set(   new_client,  
-                                    new_connection);
+            this.clients.set(   new_client.name,  
+                                    new_client);
             this.emit("connect", new_client )
             this.listen_for_messages( new_client )
         }
@@ -69,10 +105,10 @@ export class TCPServer extends EventEmitter<Events> {
 
     async listen_for_messages(client:Client) {
         const buffer                = new Uint8Array(this.options.buffer_length)
-        const client_object   = this.clients.get( client )!;
+        
         const message: number[] = [];
         while (true) {
-            const count = await client_object.read( buffer );
+            const count = await client.connection.read( buffer );
             this.logger.TRACE(`Incomgin Raw Data: ${buffer}`);
 
             if (!count) { this.handle_disconnect(client); return; }
@@ -89,13 +125,13 @@ export class TCPServer extends EventEmitter<Events> {
         }
     }
     handle_disconnect( client:Client) {
-        this.logger.INFO(`Client Disconnect : ${client}`);
-        this.clients.delete( client );
+        this.logger.INFO(`Client Disconnect : ${client.name}`);
+        this.clients.delete( client.name );
         this.emit("disconnect", client);
     }
     handle_message(client:Client, message:Uint8Array) {
         const decoded_message = this.decoder.decode(message);
-        this.logger.DEBUG(`Incoming Message from ${client} :\n ${message}`);
+        this.logger.DEBUG(`Incoming Message from ${client.name} :\n ${decoded_message}`);
         this.emit("message", decoded_message, client);
     }
 

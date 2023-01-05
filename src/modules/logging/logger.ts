@@ -35,11 +35,17 @@ class _LogLevels {
         background_color : Colors.bgBlack,
         level_value : 40
     }
+    ERROR : LogLevel = {
+        name : "ERROR",
+        color : Colors.brightRed,
+        background_color : Colors.bgBlack,
+        level_value : 50
+    }
     CTRITICAL : LogLevel = {
         name : "CRITICAL",
         color : Colors.red,
         background_color : Colors.bgBlack,
-        level_value : 50
+        level_value : 60
     }
 }
 
@@ -67,8 +73,8 @@ export class Logger {
     log( level:LogLevel, ...args:string[]) {
         if (this.options.level.level_value > level.level_value ) { return; }
         console.log(
-            Colors.inverse( level.color( ` ${level.name} `).padEnd(10, "")),
-            Colors.inverse( level.color( ` ${this.options.name} `.padEnd(16, " "))),
+            Colors.inverse( level.color( level.name.padEnd(9, " ").padStart(10, " "))),
+            Colors.inverse( level.color( this.options.name.padEnd(16, " ").padStart(17, " "))),
             level.color( args.join(" ") )
         )
     }
@@ -77,6 +83,7 @@ export class Logger {
     DEBUG(...args:string[]) { this.log( LogLevels.DEBUG, ...args )}
     INFO(...args:string[]) { this.log( LogLevels.INFO, ...args )}
     WARNING(...args:string[]) { this.log( LogLevels.WARNING, ...args )}
+    ERROR(...args:string[]) { this.log( LogLevels.ERROR, ...args )}
     CRITICAL(...args:string[]) { this.log( LogLevels.CTRITICAL, ...args )}
    
 }
