@@ -9,7 +9,7 @@ interface ClientData{
     connection : Deno.Conn
 }
 
-export class Client implements ClientData{
+export class TCP_Client implements ClientData{
     server!     : TCPServer
     connection! : Deno.Conn;
     readonly name: string
@@ -32,9 +32,9 @@ export class Client implements ClientData{
 }
 
 type Events = {
-    connect     : [Client],
-    disconnect  : [Client],
-    message     : [string, Client]
+    connect     : [TCP_Client],
+    disconnect  : [TCP_Client],
+    message     : [string, TCP_Client]
 }
 
 interface ServerOptions  {
@@ -59,7 +59,7 @@ class _ServerOptions implements ServerOptions {
 export class TCPServer extends EventEmitter<Events> {
     options : _ServerOptions
 
-    clients : Map<string, Client> 
+    clients : Map<string, TCP_Client> 
     server : Deno.Listener
     
     carriageReturn : Uint8Array
@@ -75,7 +75,7 @@ export class TCPServer extends EventEmitter<Events> {
 
         this.carriageReturn = new Uint8Array([this.options.carriage_return])
 
-        this.clients = new Map<string, Client> ;
+        this.clients = new Map<string, TCP_Client> ;
 
         this.logger = new Logger({
             name : this.options.name,
@@ -90,7 +90,7 @@ export class TCPServer extends EventEmitter<Events> {
 
     async listen_for_connections() {
         for await (const new_connection of this.server) {
-            const new_client:Client = new Client({
+            const new_client:TCP_Client = new TCP_Client({
                 server : this, connection : new_connection 
             });
 
@@ -103,7 +103,7 @@ export class TCPServer extends EventEmitter<Events> {
         }
     }
 
-    async listen_for_messages(client:Client) {
+    async listen_for_messages(client:TCP_Client) {
         const buffer                = new Uint8Array(this.options.buffer_length)
         
         const message: number[] = [];
@@ -124,12 +124,12 @@ export class TCPServer extends EventEmitter<Events> {
         buffer.fill(0);
         }
     }
-    handle_disconnect( client:Client) {
+    handle_disconnect( client:TCP_Client) {
         this.logger.INFO(`Client Disconnect : ${client.name}`);
         this.clients.delete( client.name );
         this.emit("disconnect", client);
     }
-    handle_message(client:Client, message:Uint8Array) {
+    handle_message(client:TCP_Client, message:Uint8Array) {
         const decoded_message = this.decoder.decode(message);
         this.logger.DEBUG(`Incoming Message from ${client.name} :\n ${decoded_message}`);
         this.emit("message", decoded_message, client);
