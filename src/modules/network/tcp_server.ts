@@ -1,6 +1,7 @@
 import {EventEmitter} from "https://deno.land/x/event@2.0.1/mod.ts";
-import { new_logger } from "./logger.ts";
+import {Logger, LogLevels} from "@modules/logging/logger.ts"
 
+export {LogLevels}
 
 type Client = string;
 
@@ -10,23 +11,21 @@ type Events = {
     message     : [Client, string]
 }
 
-type ServerOptions = {
+interface ServerOptions  {
     buffer_length?       : number
     message_length?      : number
     port?                : number
     carriage_return?     : number
     decoding?            : string
-    log_level?           : LevelName
     name?                : string
 }
 
-class _ServerOptions {
+class _ServerOptions implements ServerOptions {
     buffer_length       = 4
     message_length      = 1024 * 1024
     port                = 8567
     carriage_return     = 0
     decoding            = "utf-8"
-    log_level:LevelName          = "INFO"
     name                 = "TCP_Server"
 }
 
@@ -37,15 +36,19 @@ export class TCPServer extends EventEmitter<Events> {
     options : _ServerOptions
     decoder : TextDecoder
     logger : Logger
+
     constructor(options:ServerOptions) {
         super()
         this.options = Object.assign(new _ServerOptions(),  options);
         this.decoder = new TextDecoder( this.options.decoding );
         this.clients = new Map<Client, Deno.Conn> ;
 
-        this.logger = new_logger(this.options.log_level, this.options.name);
+        this.logger = new Logger({
+            name : this.options.name,
+            level: LogLevels.DEBUG
+        })
         
-        this.logger.info(`Starting Server. Listening on port ${this.options.port}` )
+        this.logger.INFO(`Starting Server. Listening on port ${this.options.port}` )
 
         this.server = Deno.listen( { port: this.options.port} )
         this.listen_for_connections()
@@ -55,7 +58,7 @@ export class TCPServer extends EventEmitter<Events> {
         for await (const new_connection of this.server) {
             const new_client:Client = `${new_connection.localAddr.hostname}:${new_connection.localAddr.port}`;
 
-            this.logger.info(`New Client : ${new_client}`)
+            this.logger.INFO(`New Client : ${new_client}`)
 
             this.clients.set(   new_client,  
                                     new_connection);
@@ -70,7 +73,7 @@ export class TCPServer extends EventEmitter<Events> {
         const message: number[] = [];
         while (true) {
             const count = await client_object.read( buffer );
-            this.logger.debug(`Incomgin Raw Data: ${buffer}`);
+            this.logger.TRACE(`Incomgin Raw Data: ${buffer}`);
 
             if (!count) { this.handle_disconnect(client); return; }
 
@@ -86,14 +89,13 @@ export class TCPServer extends EventEmitter<Events> {
         }
     }
     handle_disconnect( client:Client) {
-        this.logger.info(`Client Disconnect : ${client}`);
+        this.logger.INFO(`Client Disconnect : ${client}`);
         this.clients.delete( client );
         this.emit("disconnect", client);
     }
     handle_message(client:Client, message:Uint8Array) {
-       
         const decoded_message = this.decoder.decode(message);
-        this.logger.debug(`Incoming Message from ${client} :\n ${message}`);
+        this.logger.DEBUG(`Incoming Message from ${client} :\n ${message}`);
         this.emit("message", decoded_message, client);
     }
 

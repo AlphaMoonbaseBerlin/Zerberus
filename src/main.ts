@@ -1,11 +1,8 @@
-import { TCPServer} from "@utils/tcp_server.ts";
-
-import {Logger} from "https://deno.land/std/log/mod.ts";
-
+import { TCPServer} from "@modules/network/tcp_server.ts";
 
 
 const tcp_server = new TCPServer({});
-console.log("Startup");
+
 tcp_server.on("message", (client, message) => {
   console.log(client, message);
 })
