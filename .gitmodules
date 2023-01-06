@@ -1,0 +1,3 @@
+[submodule "cients/TouchDesigner/submodules/TD_JSON_RCP"]
+	path = cients/TouchDesigner/submodules/TD_JSON_RCP
+	url = https://github.com/AlphaMoonbaseBerlin/TD_JSON_RCP
